@@ -1,0 +1,6 @@
+*.exe
+*.bak
+*.zip
+bak/
+__pycache__
+build/
