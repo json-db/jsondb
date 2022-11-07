@@ -95,11 +95,9 @@ void dbIndexWord(DB *db, char *word, int wordLen, idx_t offset) {
     if (ibuf->len < BUF_SIZE) {
         ibuf->idx[ibuf->len++] = offset;
     } else {
-        // assert(false); // todo: 將區塊 append 到 h 對應的檔案。
         dbAppendIndexFile(db, h, ibuf);
         ibuf->len = 0;
     }
-    // indexAdd(index, offset);
 }
 
 void dbIndexDoc(DB *db, char *doc, idx_t offset) {
@@ -118,6 +116,22 @@ void dbIndexDoc(DB *db, char *doc, idx_t offset) {
             while (isdigit(*p)) p++;
             dbIndexWord(db, dp, p-dp, offset);
             dp = p;
+        } else if (memcmp(dp, "\":", 2)==0) { // json field: "name":int|"..."
+            char *p0 = dp-1;
+            while (*p0 != '"') p0--;
+            char *p1 = dp+2;
+            if (isdigit(*p1)) {
+                while (*p1 != ',' && *p1 != '}') p1++;
+                dbIndexWord(db, p0, p1-p0, offset);
+                // debug("index field:%.*s\n", (int) (p1-p0), p0);
+            } else if (*p1=='"') {
+                p1++;
+                while (*p1 != '"') p1++;
+                p1++;
+                dbIndexWord(db, p0, p1-p0, offset);
+                // debug("index field:%.*s\n", (int) (p1-p0), p0);
+            }
+            dp++;
         } else if (*dp >= 0) { // other ASCII
             dp++;
         } else { // Non ASCII UTF8 code bytes.
@@ -198,6 +212,7 @@ char *dbAddMatch(DB *db, Index *index, char *q1, char *follow, char *docs, char 
     }
     return dp;
 }
+
 char *dbMatch(DB *db, char *q, char *follow, char *docs, int maxLen) {
     assert(strlen(q)<STR_SIZE);
     char q1[STR_SIZE];
