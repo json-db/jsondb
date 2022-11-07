@@ -14,15 +14,23 @@
 #define DOCS_SIZE DOC_SIZE*10
 #define BUF_SIZE 1024
 #define HASH_SIZE 4096
-#define debug printf
-
+#ifdef _DEBUG
+#define debug(...) printf(__VA_ARGS__)
+#else
+#define debug(...)
+#endif
 typedef int32_t idx_t;
 
 typedef struct Index {
     bool loaded;
-    int idxLen, bufLen;
-    idx_t *idx, buf[BUF_SIZE];
+    int len;
+    idx_t *idx;
 } Index;
+
+typedef struct IndexBuffer {
+    int len;
+    idx_t idx[BUF_SIZE];
+} IndexBuffer;
 
 typedef struct Doc {
     idx_t offset;
@@ -38,6 +46,7 @@ typedef struct DB {
     char path[STR_SIZE];
     char *meta;
     Index index[HASH_SIZE];
+    IndexBuffer ibuf[HASH_SIZE];
     DocCache dc;
     FILE *dataFile;
     // int dataSize;
@@ -45,7 +54,7 @@ typedef struct DB {
 
 void dbOpen(DB *db, char *path);
 idx_t dbAddDoc(DB *db, char *doc);
-void dbFlush(DB *db);
+void dbSave(DB *db);
 void dbClose(DB *db);
 char *dbMatch(DB *db, char *q, char *follow, char *docs, int docsMaxSize);
 
