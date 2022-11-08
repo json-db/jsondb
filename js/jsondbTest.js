@@ -7,5 +7,5 @@ let objs = lines.map((line, i)=>{return {id:i, quote:line}})
 console.log('objs=', objs)
 
 let db = new JsonDB()
-let docs = db.load(objs)
+let docs = db.loadLines(objs)
 console.log('match(unix)=', docs.match('unix'))
