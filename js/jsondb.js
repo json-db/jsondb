@@ -45,7 +45,20 @@ export class Docs {
 }
 
 export class JsonDB {
-	load(array) {
-		return new Docs(array)
+	connectDb(url, dbType) {
+		this.dbType = dbType // type: docDB, sqlite, postgres
+		this.url = url
+	}
+	loadObjs(objs) {
+		return new Docs(objs)
+	}
+	loadLines(lines) {
+		return new Docs(lines)
+	}
+	loadCsv(lines, fields) {
+
+	}
+	loadCsvFile(fname) {
+
 	}
 }
