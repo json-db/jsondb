@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <assert.h>
-#include "utf8.h"
+#include "utf8/utf8.h"
 
 #define STR_SIZE 256
 #define DOC_SIZE 4096

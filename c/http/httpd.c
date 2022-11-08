@@ -1,7 +1,7 @@
 #include "httpd.h"
 
-void readRequest(int client_fd, char *request) {
-  int len = read(client_fd, request, TMAX);
+void readRequest(int client, char *request) {
+  int len = read(client, request, TMAX);
   request[len] = '\0';
 }
 
@@ -11,16 +11,16 @@ void parseRequest(char *request, char *op, char *path, char *body) {
   if (p) strcpy(body, p+4); else *body='\0';
 }
 
-void responseJson(int client_fd, char *json) {
+void responseText(int client, int status, char *text) {
   char response[SMAX];
-  sprintf(response, "HTTP/1.1 200 OK\r\n"
-                    "Content-Type: application/json; charset=UTF-8\r\n"
-                    "Content-Length: %ld\r\n\r\n", strlen(json));
-  write(client_fd, response, strlen(response));
-  write(client_fd, json, strlen(json));
+  sprintf(response, "HTTP/1.1 %d OK\r\n"
+                    "Content-Type: text/plain; charset=UTF-8\r\n"
+                    "Content-Length: %ld\r\n\r\n", status, strlen(text));
+  write(client, response, strlen(response));
+  write(client, text, strlen(text));
 }
 
-void responseFile(int client_fd, char *path) {
+void responseFile(int client, char *path) {
   char text[TMAX-200], response[TMAX], fpath[SMAX];
   sprintf(fpath, "./web%s", path); // ex: fpath = ./web/hello.html
   printf("responseFile:fpath=%s\n", fpath);
@@ -36,5 +36,5 @@ void responseFile(int client_fd, char *path) {
   sprintf(response, "HTTP/1.1 200 OK\r\n"
                     "Content-Type: text/html; charset=UTF-8\r\n"
                     "Content-Length: %d\r\n\r\n%s", len, text);
-  write(client_fd, response, strlen(response));
+  write(client, response, strlen(response));
 }

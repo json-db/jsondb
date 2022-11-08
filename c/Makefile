@@ -1,9 +1,11 @@
-OBJS = server
+LIBS = http/httpd.c http/net.c docDB.c
+OBJS = docDBServer
+OPTS = -Wall -D_DEBUG
 
 all: $(OBJS)
 
-server:
-	gcc -Wall -D_DEBUG http/httpd.c http/net.c server.c -lpthread -o server
+docDBServer:
+	gcc $(OPTS) $(LIBS) docDBServer.c -lpthread -o docDBServer
 
 clean:
 	rm $(OBJS)

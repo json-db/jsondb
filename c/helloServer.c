@@ -1,25 +1,28 @@
 #include <pthread.h>
 #include "http/net.h"
 #include "http/httpd.h"
+#include "docDB.h"
 
 void *serve(void *argu) {
-  int client_fd = *(int*) argu;
-  if (client_fd == -1) {
+  int client = *(int*) argu;
+  if (client == -1) {
     printf("Can't accept");
     return NULL;
   }
   char request[TMAX], path[SMAX], op[SMAX], body[TMAX];
-  readRequest(client_fd, request);
+  readRequest(client, request);
   printf("===========request=============\n%s\n", request);
   parseRequest(request, op, path, body);
   printf("op=%s path=%s body=%s\n", op, path, body);
-  if (strstr(path, "/jsondb/") != NULL) {
-    responseJson(client_fd, "{\"db\":\"JsonDB\"}");
+  char cmd[SMAX], param[SMAX];
+  int n = sscanf(path, "/jsondb/%[^/]/%[^/]", cmd, param);
+  if (n == 2) {
+    responseText(client, 200, "{\"db\":\"JsonDB\"}");
   } else {
-    responseJson(client_fd, "{\"error\":404}");
+    responseText(client, 400, "Bad Request");
   }
   sleep(1);
-  close(client_fd);
+  close(client);
   return NULL;
 }
 
@@ -31,8 +34,8 @@ int main(int argc, char *argv[]) {
   net_listen(&net);
   printf("Server started at: http://127.0.0.1:%d\n", net.port);
   while (1) {
-    int client_fd = net_accept(&net);
+    int client = net_accept(&net);
     pthread_t thread1;
-    pthread_create(&thread1, NULL, &serve, &client_fd);
+    pthread_create(&thread1, NULL, &serve, &client);
   }
 }

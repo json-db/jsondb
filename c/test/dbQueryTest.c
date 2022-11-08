@@ -7,7 +7,7 @@ DB ddb;
 int main() {
     utf8init();
     DB *db = &ddb;
-    dbOpen(db, "./jdb");
+    dbOpen(db, "../jdb");
     char docs[DOCS_SIZE];
     int maxLen = 300;
     dbMatch(db, "UNIX", NULL, docs, maxLen);

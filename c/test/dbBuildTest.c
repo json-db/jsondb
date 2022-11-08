@@ -10,7 +10,7 @@ int lineTop = 0;
 int main() {
     utf8init();
     DB *db = &ddb;
-    dbOpen(db, "./jdb");
+    dbOpen(db, "../jdb");
     FILE *fp = fopen("./line.txt", "r+");
     while (!feof(fp)) {
         char line[DOC_SIZE];

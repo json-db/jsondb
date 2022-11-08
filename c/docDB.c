@@ -1,4 +1,4 @@
-#include "docDB.h"
+#include "docDb.h"
 
 char *strLower(char *s) {
     for (char *p=s; *p; p++)
@@ -195,7 +195,9 @@ void dbSave(DB *db) {
     dbSaveBuffer(db);
 }
 
-char *dbAddMatch(DB *db, Index *index, char *q1, char *follow, char *docs, char *dp, int maxLen) {
+int dbAddMatch(DB *db, Index *index, char *q1, char *follow, char *docs, int maxLen) {
+    int count = 0;
+    char *dp = docs+strlen(docs);
     for (int i=0; i<index->len; i++) {
         // debug("idx[%d]=%d\n", i, index->idx[i]);
         char *doc = dbGetDoc(db, index->idx[i]);
@@ -208,9 +210,10 @@ char *dbAddMatch(DB *db, Index *index, char *q1, char *follow, char *docs, char 
             if (dp-docs+strlen(doc) >= maxLen-1) break;
             sprintf(dp, "%s", doc);
             dp += strlen(dp);
+            count ++;
         }
     }
-    return dp;
+    return count;
 }
 
 char *dbMatch(DB *db, char *q, char *follow, char *docs, int maxLen) {
@@ -221,12 +224,12 @@ char *dbMatch(DB *db, char *q, char *follow, char *docs, int maxLen) {
     debug("q1=%s\n", q1);
     int h = strHash(q1, strlen(q1));
     Index *index = dbReadIndex(db, h);
-    char *dp = docs;
-    dp = dbAddMatch(db, index, q1, follow, docs, dp, maxLen);
+    docs[0] = '\0';
+    int iCount = dbAddMatch(db, index, q1, follow, docs, maxLen);
     Index bufIndex;
     bufIndex.len = db->ibuf[h].len;
     bufIndex.idx = db->ibuf[h].idx;
-    dp = dbAddMatch(db, &bufIndex, q1, follow, docs, dp, maxLen);
-    debug("docs=%s\n", docs);
+    int bCount = dbAddMatch(db, &bufIndex, q1, follow, docs, maxLen);
+    debug("docs=%s\niCount=%d\nbCount=%d\n", docs, iCount, bCount);
     return docs;
 }

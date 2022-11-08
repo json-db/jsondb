@@ -3,9 +3,9 @@
 
 #include "net.h"
 
-void readRequest(int client_fd, char *request);
+void readRequest(int client, char *request);
 void parseRequest(char *request, char *op, char *path, char *body);
-void responseJson(int client_fd, char *json);
-void responseFile(int client_fd, char *path);
+void responseText(int client, int status, char *text);
+void responseFile(int client, char *path);
 
 #endif
