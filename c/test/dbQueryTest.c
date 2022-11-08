@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "docDB.h"
+#include "../docDB.h"
 
 DB ddb;
 

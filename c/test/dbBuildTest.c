@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "docDB.h"
+#include "../docDB.h"
 
 DB ddb;
 
@@ -11,7 +11,7 @@ int main() {
     utf8init();
     DB *db = &ddb;
     dbOpen(db, "./jdb");
-    FILE *fp = fopen("line.txt", "r+");
+    FILE *fp = fopen("./line.txt", "r+");
     while (!feof(fp)) {
         char line[DOC_SIZE];
         fgets(line, DOC_SIZE, fp);
