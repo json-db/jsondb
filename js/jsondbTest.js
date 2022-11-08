@@ -7,5 +7,12 @@ let objs = lines.map((line, i)=>{return {id:i, quote:line}})
 console.log('objs=', objs)
 
 let db = new JsonDB()
-let docs = db.loadLines(objs)
-console.log('match(unix)=', docs.match('unix'))
+var docs
+docs = await db.loadCsvFile('test.csv')
+console.log('docs=', docs)
+console.log('match(ccc)=', docs.match('ccc'))
+
+docs = db.loadObjs(objs)
+console.log('match(費曼).match(科學).sort(id, DESC)=', docs.match('費曼').match('科學').sort('id', 'DESC'))
+
+

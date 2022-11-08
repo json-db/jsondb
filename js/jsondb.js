@@ -1,3 +1,20 @@
+export async function fileToLines(file) {
+	const text = await Deno.readTextFile(file)
+	let lines = text.split(/\r?\n/)
+	                .filter((line)=>line.length>0)
+	return lines
+}
+
+export function csvToObj(line, fields) {
+	fields = fields || this.fields
+	let values = line.split(",")
+	let obj = {}
+	for (let i=0; i<fields.length; i++) {
+		obj[fields[i]] = values[i]
+	}
+	return obj
+} 
+
 export class Docs {
 	constructor(array) {
 		this.docs = []
@@ -12,8 +29,9 @@ export class Docs {
 	}
 
 	filter(f) {
-		let docs = this.docs.filter(f)
-		return new Docs(docs)
+		let r = new Docs([])
+		r.docs = this.docs.filter(f)
+		return r
 	}
 
 	where(f) {
@@ -23,7 +41,9 @@ export class Docs {
 	sort(key, order="INC") {
 		let docs = this.docs.sort((x,y)=>x.obj[key]<y.obj[key])
 		if (order=="DESC") docs = docs.reverse()
-		return new Docs(docs)
+		let r = new Docs([])
+		r.docs = docs
+		return r
 	}
 	
 	match(q) {
@@ -32,11 +52,11 @@ export class Docs {
 	}
 
 	toObj() {
-		return this.docs.map((x)=>x['obj'])
+		return this.docs.map((x)=>x.obj)
 	}
 
 	toText() {
-		return this.docs.map((x)=>x['text'])
+		return this.docs.map((x)=>x.text)
 	}
 
 	toString() {
@@ -45,6 +65,8 @@ export class Docs {
 }
 
 export class JsonDB {
+	constructor() {
+	}
 	connectDb(url, dbType) {
 		this.dbType = dbType // type: docDB, sqlite, postgres
 		this.url = url
@@ -52,13 +74,26 @@ export class JsonDB {
 	loadObjs(objs) {
 		return new Docs(objs)
 	}
-	loadLines(lines) {
-		return new Docs(lines)
+	loadJsons(jsons) {
+		return new Docs(jsons)
 	}
 	loadCsv(lines, fields) {
-
+		let docs = []
+		fields = fields || this.fields
+		for (let line of lines) {
+			let obj = csvToObj(line, fields)
+			console.log('csv:obj=', obj)
+			docs.push(obj)
+		}
+		return new Docs(docs)
 	}
-	loadCsvFile(fname) {
-
+	async loadCsvFile(file) {
+		let lines = await fileToLines(file)
+		let fields = lines[0].split(",")
+		return this.loadCsv(lines.slice(1), fields)
+	}
+	async loadJsonFile(file) {
+		let lines = await fileToLines(file)
+		return this.loadJsons(lines, fields)
 	}
 }
