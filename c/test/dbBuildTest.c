@@ -22,7 +22,7 @@ int main() {
         }
     }
     fclose(fp);
-    int n = lineTop * 2;
+    int n = 10000; // lineTop * 2;
     for (int i=0; i<n; i++) {
         char doc[DOC_SIZE];
         sprintf(doc, "{\"id\":%d,\"text\":\"%s\"}", i, lines[i%lineTop]);

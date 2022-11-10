@@ -20,17 +20,7 @@
 #define debug(...)
 #endif
 typedef int32_t idx_t;
-
-typedef struct Index {
-    bool loaded;
-    int len;
-    idx_t *idx;
-} Index;
-
-typedef struct IndexBuffer {
-    int len;
-    idx_t idx[BUF_SIZE];
-} IndexBuffer;
+typedef int32_t ilen_t;
 
 typedef struct Doc {
     idx_t offset;
@@ -45,11 +35,12 @@ typedef struct DocCache {
 typedef struct DB {
     char path[STR_SIZE];
     char *meta;
-    Index index[HASH_SIZE];
-    IndexBuffer ibuf[HASH_SIZE];
+    idx_t *diskIdx[HASH_SIZE];
+    ilen_t diskLen[HASH_SIZE];
+    idx_t bufIdx[HASH_SIZE][BUF_SIZE];
+    ilen_t bufLen[HASH_SIZE];
     DocCache dc;
     FILE *dataFile;
-    // int dataSize;
 } DB;
 
 void dbOpen(DB *db, char *path);

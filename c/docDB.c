@@ -24,14 +24,6 @@ int fileSize(FILE *fp) {
     return ftell(fp);
 }
 
-void indexRead(Index *index, FILE *fp) {
-    if (index->loaded) return; // 已經讀過了，直接傳回
-    int size = fileSize(fp);
-    index->idx = malloc(size);
-    index->len = size/sizeof(idx_t);
-    fseek(fp, 0L, SEEK_SET);
-    fread(index->idx, sizeof(idx_t), index->len, fp);
-}
 
 bool isDir(char *path) {
     struct stat sb;
@@ -67,36 +59,40 @@ idx_t dbWriteDoc(DB *db, char *doc) {
     return offset;
 }
 
-Index *dbReadIndex(DB *db, int h) {
-    Index *index = &db->index[h];
-    if (index->loaded) return index;
+void dbReadIndex(DB *db, int h) {
+    if (db->diskIdx[h]) return; // 已經讀過了，直接傳回
     char idxFileName[STR_SIZE+20];
     sprintf(idxFileName, "%s/idx/%d", db->path, h);
     FILE *idxFile = fopen(idxFileName, "r+b");
-    if (!idxFile) return index; // 檔案開啟失敗，該檔案不存在！
-    indexRead(index, idxFile);
+    if (!idxFile) return; // 檔案開啟失敗，該檔案不存在！
+    int size = fileSize(idxFile);
+    db->diskIdx[h] = malloc(size);
+    db->diskLen[h] = size/sizeof(idx_t);
+    fseek(idxFile, 0L, SEEK_SET);
+    fread(db->diskIdx[h], sizeof(idx_t), db->diskLen[h], idxFile);
     fclose(idxFile);
-    return index;
 }
 
-void dbAppendIndexFile(DB *db, int h, IndexBuffer *ibuf) {
+void dbFlushBuffer(DB *db, int h) {
     char idxFileName[STR_SIZE+20];
     sprintf(idxFileName, "%s/idx/%d", db->path, h);
     FILE *idxFile = fopen(idxFileName, "a+b");
     assert(idxFile);
-    assert(ibuf->len == BUF_SIZE);
-    fwrite(ibuf, sizeof(IndexBuffer), 1, idxFile);
+    assert(db->bufLen[h] == BUF_SIZE);
+    fwrite(db->bufIdx[h], sizeof(db->bufIdx[h]), 1, idxFile);
     fclose(idxFile);
 }
 
 void dbIndexWord(DB *db, char *word, int wordLen, idx_t offset) {
     int h = strHash(word, wordLen);
-    IndexBuffer *ibuf = &db->ibuf[h];
-    if (ibuf->len < BUF_SIZE) {
-        ibuf->idx[ibuf->len++] = offset;
+    ilen_t blen = db->bufLen[h];
+    idx_t *buf = db->bufIdx[h];
+    if (blen < BUF_SIZE) {
+        buf[blen] = offset;
+        db->bufLen[h]++;
     } else {
-        dbAppendIndexFile(db, h, ibuf);
-        ibuf->len = 0;
+        dbFlushBuffer(db, h);
+        db->bufLen[h]=0;
     }
 }
 
@@ -155,7 +151,9 @@ void dbSaveBuffer(DB *db) {
     char fname[STR_SIZE+20];
     sprintf(fname, "%s/buf.idx", db->path);
     FILE *fp = fopen(fname, "wb");
-    fwrite(db->ibuf, sizeof(db->ibuf), 1, fp);
+    fwrite(db->diskLen, sizeof(db->diskLen), 1, fp);
+    fwrite(db->bufLen, sizeof(db->bufLen), 1, fp);
+    fwrite(db->bufIdx, sizeof(db->bufIdx), 1, fp);
     fclose(fp);
 }
 
@@ -163,7 +161,9 @@ void dbLoadBuffer(DB *db) {
     char fname[STR_SIZE+20];
     sprintf(fname, "%s/buf.idx", db->path);
     FILE *fp = fopen(fname, "rb");
-    fread(db->ibuf, sizeof(db->ibuf), 1, fp);
+    fread(db->diskLen, sizeof(db->diskLen), 1, fp);
+    fread(db->bufLen, sizeof(db->bufLen), 1, fp);
+    fread(db->bufIdx, sizeof(db->bufIdx), 1, fp);
     fclose(fp);
 }
 
@@ -195,12 +195,12 @@ void dbSave(DB *db) {
     dbSaveBuffer(db);
 }
 
-int dbAddMatch(DB *db, Index *index, char *q1, char *follow, char *docs, int maxLen) {
+int dbAddMatch(DB *db, idx_t *idx, ilen_t ilen, char *q1, char *follow, char *docs, int maxLen) {
     int count = 0;
     char *dp = docs+strlen(docs);
-    for (int i=0; i<index->len; i++) {
+    for (int i=0; i<ilen; i++) {
         // debug("idx[%d]=%d\n", i, index->idx[i]);
-        char *doc = dbGetDoc(db, index->idx[i]);
+        char *doc = dbGetDoc(db, idx[i]);
         // debug("doc=%s\n", doc);
         char doc1[DOC_SIZE];
         strcpy(doc1, doc);
@@ -223,13 +223,10 @@ char *dbMatch(DB *db, char *q, char *follow, char *docs, int maxLen) {
     strLower(q1);
     debug("q1=%s\n", q1);
     int h = strHash(q1, strlen(q1));
-    Index *index = dbReadIndex(db, h);
+    dbReadIndex(db, h);
     docs[0] = '\0';
-    int iCount = dbAddMatch(db, index, q1, follow, docs, maxLen);
-    Index bufIndex;
-    bufIndex.len = db->ibuf[h].len;
-    bufIndex.idx = db->ibuf[h].idx;
-    int bCount = dbAddMatch(db, &bufIndex, q1, follow, docs, maxLen);
+    int iCount = dbAddMatch(db, db->diskIdx[h], db->diskLen[h], q1, follow, docs, maxLen);
+    int bCount = dbAddMatch(db, db->bufIdx[h], db->bufLen[h], q1, follow, docs, maxLen);
     debug("docs=%s\niCount=%d\nbCount=%d\n", docs, iCount, bCount);
     return docs;
 }
