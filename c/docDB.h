@@ -32,6 +32,11 @@ typedef struct DocCache {
     Doc *docp[HASH_SIZE];
 } DocCache;
 
+typedef struct Index {
+    idx_t *diskIdx, *bufIdx;
+    int diskLen, bufLen;
+} Index;
+
 typedef struct DB {
     char path[STR_SIZE];
     char *meta;

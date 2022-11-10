@@ -66,6 +66,7 @@ void dbReadIndex(DB *db, int h) {
     FILE *idxFile = fopen(idxFileName, "r+b");
     if (!idxFile) return; // 檔案開啟失敗，該檔案不存在！
     int size = fileSize(idxFile);
+    printf("fileSize()=%d\n", size);
     db->diskIdx[h] = malloc(size);
     db->diskLen[h] = size/sizeof(idx_t);
     fseek(idxFile, 0L, SEEK_SET);
@@ -195,7 +196,68 @@ void dbSave(DB *db) {
     dbSaveBuffer(db);
 }
 
-int dbAddMatch(DB *db, idx_t *idx, ilen_t ilen, char *q1, char *follow, char *docs, int maxLen) {
+int intersect(idx_t *rIdx, idx_t *idx1, ilen_t len1, idx_t *idx2, ilen_t len2) {
+    int i1=0, i2=0, ri=0;
+    while (i1<len1 && i2<len2) {
+        if (idx1[i1]<idx2[i2]) {
+            i1++;
+        } else if (idx1[i1]>idx2[i2]) {
+            i2++;
+        } else if (idx1[i1]==idx2[i2]) {
+            rIdx[ri++] = idx1[i1];
+            i1++; i2++;
+        }
+    }
+    return ri;
+}
+
+int idxAppend(DB *db, idx_t *idx, ilen_t ilen, int h) {
+    printf("h=%d diskLen=%d bufLen=%d\n", h, db->diskLen[h], db->bufLen[h]);
+    memcpy(idx, db->diskIdx[h], (size_t) (db->diskLen[h]*sizeof(idx_t)));
+    ilen += db->diskLen[h];
+    memcpy(&idx[ilen], db->bufIdx[h], (size_t) (db->bufLen[h]*sizeof(idx_t)));
+    ilen += db->bufLen[h];
+    return ilen;
+}
+
+int idxIntersection(DB *db, idx_t *idx, ilen_t ilen, int h) {
+    idx_t *dIdx = db->diskIdx[h], *bIdx = db->bufIdx[h];
+    ilen_t dLen = db->diskLen[h], bLen = db->bufLen[h];
+    ilen_t len = dLen+bLen, rLen=0;
+    idx_t rIdx[len], hIdx[len];
+    memcpy(hIdx, dIdx, dLen*sizeof(idx_t));
+    memcpy(hIdx+dLen, bIdx, bLen*sizeof(idx_t));
+    rLen = intersect(rIdx, idx, ilen, hIdx, len);
+    memcpy(idx, rIdx, rLen*sizeof(idx_t));
+    return rLen;
+}
+
+int dbQueryIdx(DB *db, char *q, int *idx) {
+    int ilen = 0;
+    char *p = q, *word = q;
+    printf("dbQueryIdx\n");
+    while (1) {
+        if (*p == ' ' || *p=='\0') {
+            printf("word=%.*s\n", (int) (p-word), word);
+            int h = strHash(word, p-word);
+            dbReadIndex(db, h);
+            if (word == q) {
+                ilen = idxAppend(db, idx, 0, h);
+            } else {
+                ilen = idxIntersection(db, idx, ilen, h);
+            }
+            printf("ilen=%d\n", ilen);
+            while (*p == ' ') p++;
+            word = p;
+            if (*p == '\0') break;
+        } else {
+            p++;
+        }
+    }
+    return ilen;
+}
+
+int dbAddMatch(DB *db, idx_t *idx, ilen_t ilen, char *q1, char *docs, int maxLen) {
     int count = 0;
     char *dp = docs+strlen(docs);
     for (int i=0; i<ilen; i++) {
@@ -206,7 +268,7 @@ int dbAddMatch(DB *db, idx_t *idx, ilen_t ilen, char *q1, char *follow, char *do
         strcpy(doc1, doc);
         strLower(doc1);
         char *qs = strstr(doc1, q1);
-        if (qs && (follow == NULL || strchr(follow, qs[strlen(q1)]))) {
+        if (qs) {
             if (dp-docs+strlen(doc) >= maxLen-1) break;
             sprintf(dp, "%s", doc);
             dp += strlen(dp);
@@ -222,11 +284,31 @@ char *dbMatch(DB *db, char *q, char *follow, char *docs, int maxLen) {
     strcpy(q1, q);
     strLower(q1);
     debug("q1=%s\n", q1);
+    idx_t idx[BUF_SIZE*10];
+    int ilen = dbQueryIdx(db, q1, idx);
+    // int h = strHash(q1, strlen(q1));
+    // dbReadIndex(db, h);
+    debug("ilen=%d\n", ilen);
+    docs[0] = '\0';
+    int count = dbAddMatch(db, idx, ilen, q1, docs, maxLen);
+    debug("docs=%s\ncount=%d\n", docs, count);
+    return docs;
+}
+
+/*
+char *dbMatch(DB *db, char *q, char *follow, char *docs, int maxLen) {
+    assert(strlen(q)<STR_SIZE);
+    char q1[STR_SIZE];
+    strcpy(q1, q);
+    strLower(q1);
+    debug("q1=%s\n", q1);
     int h = strHash(q1, strlen(q1));
     dbReadIndex(db, h);
+    // ilen = dbQueryIdx(db, q, idx) 這裡要測試！
     docs[0] = '\0';
     int iCount = dbAddMatch(db, db->diskIdx[h], db->diskLen[h], q1, follow, docs, maxLen);
     int bCount = dbAddMatch(db, db->bufIdx[h], db->bufLen[h], q1, follow, docs, maxLen);
     debug("docs=%s\niCount=%d\nbCount=%d\n", docs, iCount, bCount);
     return docs;
 }
+*/
