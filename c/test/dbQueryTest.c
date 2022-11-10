@@ -10,8 +10,11 @@ int main() {
     dbOpen(db, "../jdb");
     int maxLen = 10000; // 1000;
     char docs[maxLen+1];
-    dbMatch(db, "UNIX", NULL, docs, maxLen);
-    dbMatch(db, "電磁場", NULL, docs, maxLen);
-    dbMatch(db, "中村修二", NULL, docs, maxLen);
+    dbMatch(db, "UNIX", docs, maxLen);
+    dbMatch(db, "UNIX inode", docs, maxLen);
+    dbMatch(db, "UNIX 李遠哲", docs, maxLen);
+    dbMatch(db, "拉塞福 物理", docs, maxLen);
+    // dbMatch(db, "電磁場", NULL, docs, maxLen);
+    // dbMatch(db, "中村修二", NULL, docs, maxLen);
     dbClose(db);
 }

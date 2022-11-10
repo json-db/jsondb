@@ -52,7 +52,7 @@ void dbOpen(DB *db, char *path);
 idx_t dbAddDoc(DB *db, char *doc);
 void dbSave(DB *db);
 void dbClose(DB *db);
-char *dbMatch(DB *db, char *q, char *follow, char *docs, int docsMaxSize);
+char *dbMatch(DB *db, char *q, char *docs, int docsMaxSize);
 
 // https://stackoverflow.com/questions/8666378/detect-windows-or-linux-in-c-c
 #ifdef _WIN32
