@@ -1,5 +1,8 @@
 #include "docDb.h"
 
+#define STOPS "的了是＆︿％＄＃＠～＋－＊／｜＼＝，。‧、；：？！（）｛｝［］「」＂’＜＞"
+#define K 1024
+
 char *strLower(char *s) {
     for (char *p=s; *p; p++)
         *p = tolower(*p);
@@ -80,9 +83,12 @@ void dbFlushBuffer(DB *db, int h) {
     assert(db->bufLen[h] == BUF_SIZE);
     fwrite(db->bufIdx[h], sizeof(db->bufIdx[h]), 1, idxFile);
     fclose(idxFile);
+    db->diskLen[h] += BUF_SIZE;
+    db->bufLen[h]=0;
 }
 
 void dbIndexWord(DB *db, char *word, int wordLen, idx_t offset) {
+    // debug("word=%.*s\n", wordLen, word);
     int h = strHash(word, wordLen);
     ilen_t blen = db->bufLen[h];
     idx_t *buf = db->bufIdx[h];
@@ -91,8 +97,37 @@ void dbIndexWord(DB *db, char *word, int wordLen, idx_t offset) {
         db->bufLen[h]++;
     } else {
         dbFlushBuffer(db, h);
-        db->bufLen[h]=0;
+        if (db->diskLen[h]>9*K)
+            debug("h=%d word:%.*s diskLen=%d\n", h, wordLen, word, db->diskLen[h]);
     }
+}
+
+char *dbIndexStr(DB *db, char *str, idx_t offset) {
+    char *p = str;
+    while (*p && *p != '"') {
+        char *word = p;
+        if (isalpha(*p)) { // english word
+            while (isalpha(*p)) p++;
+            dbIndexWord(db, word, p-word, offset);
+        } else if (isdigit(*p)) { // number
+            while (isdigit(*p)) p++;
+            dbIndexWord(db, word, p-word, offset);
+        } else if (*p >= 0) { // other ASCII
+            p++;
+        } else { // Non ASCII UTF8 code bytes.
+            for (int i=0; i<4; i++) {
+                int len = utf8len(p);
+                if (len == 1) break; // 是 ASCII，離開！ 
+                char utf8[10];
+                memcpy(utf8, p, len);
+                utf8[len] = '\0';
+                p += len;
+                if (strstr(STOPS, utf8)) break; // 是虛詞或符號，離開！
+                dbIndexWord(db, word, p-word, offset);
+            }
+        }
+    }
+    return p;
 }
 
 void dbIndexDoc(DB *db, char *doc, idx_t offset) {
@@ -100,40 +135,18 @@ void dbIndexDoc(DB *db, char *doc, idx_t offset) {
     char doc1[DOC_SIZE];
     strcpy(doc1, doc);
     strLower(doc1);
-    char *dp = doc1;
-    while (*dp) {
-        char *p = dp;
-        if (isalpha(*dp)) { // english word
-            while (isalpha(*p)) p++;
-            dbIndexWord(db, dp, p-dp, offset);
-            dp = p;
-        } else if (isdigit(*dp)) { // number
-            while (isdigit(*p)) p++;
-            dbIndexWord(db, dp, p-dp, offset);
-            dp = p;
-        } else if (memcmp(dp, "\":", 2)==0) { // json field: "name":int|"..."
-            char *p0 = dp-1;
-            while (*p0 != '"') p0--;
-            char *p1 = dp+2;
-            if (isdigit(*p1)) {
-                while (*p1 != ',' && *p1 != '}') p1++;
-                dbIndexWord(db, p0, p1-p0, offset);
-            } else if (*p1=='"') {
-                p1++;
-                while (*p1 != '"') p1++;
-                p1++;
-                dbIndexWord(db, p0, p1-p0, offset);
+    char *p = doc1;
+    while (*p) {
+        if (*p == '"') {
+            char *str = ++p;
+            while (*p != '"') p++;
+            p++; // skip "
+            if (*p != ':') { // 不是 "field": 的情況！
+              dbIndexStr(db, str, offset);
+              // debug("indexStr: %.*s\n", (int) (p-str), str);
             }
-            dp++;
-        } else if (*dp >= 0) { // other ASCII
-            dp++;
-        } else { // Non ASCII UTF8 code bytes.
-            for (int i=0; i<4; i++) {
-                int len = utf8len(p); 
-                p += len;
-                dbIndexWord(db, dp, p-dp, offset);
-            }
-            dp += utf8len(dp);
+        } else {
+            p++;
         }
     }
 }

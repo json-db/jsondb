@@ -13,7 +13,7 @@ int main() {
     dbMatch(db, "UNIX", docs, maxLen);
     dbMatch(db, "UNIX inode", docs, maxLen);
     dbMatch(db, "UNIX 李遠哲", docs, maxLen);
-    dbMatch(db, "拉塞福 物理", docs, maxLen);
+    dbMatch(db, "拉塞福 money", docs, maxLen);
     // dbMatch(db, "電磁場", NULL, docs, maxLen);
     // dbMatch(db, "中村修二", NULL, docs, maxLen);
     dbClose(db);
