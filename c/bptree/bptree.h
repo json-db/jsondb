@@ -1,17 +1,20 @@
 #pragma once
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
 
 #define NCHILD 5
 
 typedef struct bptNode {
-	int isRoot, isLeaf;
-	int nkey;
-	int key[NCHILD];
-	int pos[NCHILD];
-	void* child[NCHILD];
+	bool isLeaf;
+	uint16_t nkey;
+	union {
+		int key[NCHILD];
+		char *skey[NCHILD];
+	};
+	void* child[NCHILD]; // 樹葉的 child 指向 value，中間指向 bptNode
 	struct bptNode* father;
 	struct bptNode* next;
 	struct bptNode* last;
@@ -20,7 +23,7 @@ typedef struct bptNode {
 // extern void bptSetMaxChildNumber(int);
 extern void bptInit();
 extern void bptDestroy();
-extern int bptInsert(int, int, void*);
+extern int bptInsert(int, void*);
 extern int bptGetTotalNodes();
 extern int bptQueryKey(int);
 extern int bptQueryRange(int, int);

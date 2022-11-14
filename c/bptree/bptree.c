@@ -3,13 +3,11 @@
 
 struct bptNode* Root;
 
-int MaxChildNumber = NCHILD;
 int TotalNodes;
 
 /** Create a new B+tree Node */
 bptNode* bptNodeNew() {
 	struct bptNode* p = (struct bptNode*)malloc(sizeof(struct bptNode));
-	p->isRoot = false;
 	p->isLeaf = false;
 	p->nkey = 0;
 	p->child[0] = NULL;
@@ -37,27 +35,25 @@ int find(bptNode* node, int key) {
 }
 
 /**
- * node(MaxChildNumber) split into two part:
+ * node(NCHILD) split into two part:
  *	(1) node(0 .. Mid - 1) with original key
- *	(2) Temp(Mid .. MaxChildNumber) with key[Mid]
- * where Mid = MaxChildNumber / 2
+ *	(2) Temp(Mid .. NCHILD) with key[Mid]
+ * where Mid = NCHILD / 2
  * Note that only when Split() is called, a new Node is created
  */
-void Insert(bptNode*, int, int, void*);
+void Insert(bptNode*, int, void*);
 void Split(bptNode* node) {
-	// copy node(Mid .. MaxChildNumber) -> Temp(0 .. Temp->nkey)
+	// copy node(Mid .. NCHILD) -> Temp(0 .. Temp->nkey)
 	bptNode* Temp = bptNodeNew();
 	bptNode* ch;
-	int Mid = MaxChildNumber >> 1;
+	int Mid = NCHILD >> 1;
 	Temp->isLeaf = node->isLeaf; // Temp's depth == node's depth
-	Temp->nkey = MaxChildNumber - Mid;
+	Temp->nkey = NCHILD - Mid;
 	int i;
-	for (i = Mid; i < MaxChildNumber; i++) {
+	for (i = Mid; i < NCHILD; i++) {
 		Temp->child[i - Mid] = node->child[i];
 		Temp->key[i - Mid] = node->key[i];
-		if (Temp->isLeaf) {
-			Temp->pos[i - Mid] = node->pos[i];
-		} else {
+		if (!Temp->isLeaf) {
 			ch = (bptNode*)Temp->child[i - Mid];
 			ch->father = Temp;
 		}
@@ -65,17 +61,15 @@ void Split(bptNode* node) {
 	// Change node
 	node->nkey = Mid;
 	// Insert Temp
-	if (node->isRoot) {
+	if (node == Root) {
 		// Create a new Root, the depth of Tree is increased
 		Root = bptNodeNew();
 		Root->nkey = 2;
-		Root->isRoot = true;
 		Root->key[0] = node->key[0];
 		Root->child[0] = node;
 		Root->key[1] = Temp->key[0];
 		Root->child[1] = Temp;
 		node->father = Temp->father = Root;
-		node->isRoot = false;
 		if (node->isLeaf) {
 			node->next = Temp;
 			Temp->last = node;
@@ -83,23 +77,21 @@ void Split(bptNode* node) {
 	} else {
 		// Try to insert Temp to node->father
 		Temp->father = node->father;
-		Insert(node->father, node->key[Mid], -1, (void*)Temp);
+		Insert(node->father, node->key[Mid], (void*)Temp);
 	}
 }
 
 /** Insert (key, value) into node, if node is full, then split it to fit the definition of B+tree */
-void Insert(bptNode* node, int key, int pos, void* value) {
+void Insert(bptNode* node, int key, void* value) {
 	int i, ins;
 	if (key < node->key[0]) ins = 0; else ins = find(node, key) + 1;
 	for (i = node->nkey; i > ins; i--) {
 		node->key[i] = node->key[i - 1];
 		node->child[i] = node->child[i - 1];
-		if (node->isLeaf) node->pos[i] = node->pos[i - 1];
 	}
 	node->nkey++;
 	node->key[ins] = key;
 	node->child[ins] = value;
-	node->pos[ins] = pos;
 	if (node->isLeaf == false) { // make links on leaves
 		bptNode* firstChild = (bptNode*)(node->child[0]);
 		if (firstChild->isLeaf == true) { // which means value is also a leaf as child[0]	
@@ -121,7 +113,7 @@ void Insert(bptNode* node, int key, int pos, void* value) {
 			}
 		}
 	}
-	if (node->nkey == MaxChildNumber) // children is full
+	if (node->nkey == NCHILD) // children is full
 		Split(node);
 }
 
@@ -135,9 +127,7 @@ void Resort(bptNode* Left, bptNode* Right) {
 		while (Left->nkey < leftSize) {
 			Left->key[Left->nkey] = Right->key[i];
 			Left->child[Left->nkey] = Right->child[i];
-			if (Left->isLeaf) {
-				Left->pos[Left->nkey] = Right->pos[i];
-			} else {
+			if (!Left->isLeaf) {
 				temp = (bptNode*)(Right->child[i]);
 				temp->father = Left;
 			}
@@ -147,7 +137,6 @@ void Resort(bptNode* Left, bptNode* Right) {
 		while (i < Right->nkey) {
 			Right->key[j] = Right->key[i];
 			Right->child[j] = Right->child[i];
-			if (Right->isLeaf) Right->pos[j] = Right->pos[i];
 			i++;
 			j++;
 		}
@@ -158,14 +147,11 @@ void Resort(bptNode* Left, bptNode* Right) {
 		for (i = Right->nkey - 1; i >= 0; i--) {
 			Right->key[i + move] = Right->key[i];
 			Right->child[i + move] = Right->child[i];
-			if (Right->isLeaf) Right->pos[i + move] = Right->pos[i];
 		}
 		for (i = leftSize; i < Left->nkey; i++) {
 			Right->key[j] = Left->key[i];
 			Right->child[j] = Left->child[i];
-			if (Right->isLeaf) {
-				Right->pos[j] = Left->pos[i];
-			} else {
+			if (!Right->isLeaf) {
 				temp = (bptNode*)Left->child[i];
 				temp->father = Right;
 			}
@@ -186,10 +172,9 @@ void Resort(bptNode* Left, bptNode* Right) {
  */
 void Delete(bptNode*, int);
 void Redistribute(bptNode* node) {
-	if (node->isRoot) {
+	if (node == Root) {
 		if (node->nkey == 1 && !node->isLeaf) {
 			Root = node->child[0];
-			Root->isRoot = true;
 			free(node);
 		}
 		return;
@@ -201,7 +186,7 @@ void Redistribute(bptNode* node) {
 	int ipos = find(father, node->key[0]);
 	if (ipos + 1 < father->nkey) {
 		succChild = father->child[ipos + 1];
-		if ((succChild->nkey - 1) * 2 >= MaxChildNumber) { // at least can move one child to node
+		if ((succChild->nkey - 1) * 2 >= NCHILD) { // at least can move one child to node
 			Resort(node, succChild); // (1) resort with right child
 			father->key[ipos + 1] = succChild->key[0];
 			return;
@@ -209,7 +194,7 @@ void Redistribute(bptNode* node) {
 	}
 	if (ipos - 1 >= 0) {
 		prevChild = father->child[ipos - 1];
-		if ((prevChild->nkey - 1) * 2 >= MaxChildNumber) {
+		if ((prevChild->nkey - 1) * 2 >= NCHILD) {
 			Resort(prevChild, node); // (2) resort with left child
 			father->key[ipos] = node->key[0];
 			return;
@@ -220,9 +205,7 @@ void Redistribute(bptNode* node) {
 		while (i < succChild->nkey) {
 			node->key[node->nkey] = succChild->key[i];
 			node->child[node->nkey] = succChild->child[i];
-			if (node->isLeaf) {
-				node->pos[node->nkey] = succChild->pos[i];
-			} else {
+			if (!node->isLeaf) {
 				temp = (bptNode*)(succChild->child[i]);
 				temp->father = node;
 			}
@@ -237,9 +220,7 @@ void Redistribute(bptNode* node) {
 		while (i < node->nkey) {
 			prevChild->key[prevChild->nkey] = node->key[i];
 			prevChild->child[prevChild->nkey] = node->child[i];
-			if (node->isLeaf) {
-				prevChild->pos[prevChild->nkey] = node->pos[i];
-			} else {
+			if (!node->isLeaf) {
 				temp = (bptNode*)(node->child[i]);
 				temp->father = prevChild;
 			}
@@ -259,7 +240,6 @@ void Delete(bptNode* node, int key) {
 	for (i = del; i < node->nkey - 1; i++) {
 		node->key[i] = node->key[i + 1];
 		node->child[i] = node->child[i + 1];
-		if (node->isLeaf) node->pos[i] = node->pos[i + 1];
 	}
 	node->nkey--;
 	if (node->isLeaf == false) { // make links on leaves
@@ -272,20 +252,20 @@ void Delete(bptNode* node, int key) {
 			if (succChild != NULL) succChild->last = prevChild;
 		}
 	}
-	if (del == 0 && !node->isRoot) { // some fathers' key should be changed
+	if (del == 0 && node!=Root) { // some fathers' key should be changed
 		bptNode* temp = node;
-		while (!temp->isRoot && temp == temp->father->child[0]) {
+		while (temp != Root && temp == temp->father->child[0]) {
 			temp->father->key[0] = node->key[0];
 			temp = temp->father;
 		}
-		if (!temp->isRoot) {
+		if (temp != Root) {
 			temp = temp->father;
 			int i = find(temp, key);
 			temp->key[i] = node->key[0];
 		}
 	}
 	free(delChild);
-	if (node->nkey * 2 < MaxChildNumber)
+	if (node->nkey * 2 < NCHILD)
 		Redistribute(node);
 }
 
@@ -334,24 +314,12 @@ void Print(bptNode* node) {
 	}
 }
 
-/*/
-		pos = BPlusTree_Find(new_key);
-		if (pos == -1) {
-			new_pos = File_Insert(new_key, new_st);
-			keys[key_num++] = new_key;
-			BPlusTree_Insert(new_key, new_pos, value);
-			validRecords++;
-			printf("Insert success.\n");
-		} else {
-			printf("Insert failed, the key already exist.\n");
-		}
-*/
 /** Interface: Insert (key, value) into B+tree */
-int bptInsert(int key, int pos, void* value) {
+int bptInsert(int key, void* value) {
 	bptNode* leaf = findLeaf(key, true);
 	int i = find(leaf, key);
 	// if (leaf->key[i] == key) return false; // key 重複就不新增 ???
-	Insert(leaf, key, pos, value);
+	Insert(leaf, key, value);
 	return true;
 }
 
@@ -400,14 +368,6 @@ int bptQueryRange(int l, int r) {
 	return ansNum;
 }
 
-/** Interface: findLeaf the position of given key */
-int bptFind(int key) {
-	bptNode* leaf = findLeaf(key, false);
-	int i = find(leaf, key);
-	if (leaf->key[i] != key) return -1; // don't have this key
-	return leaf->pos[i];
-}
-
 /** Interface: modify value on the given key */
 void bptModify(int key, void* value) {
 	bptNode* leaf = findLeaf(key, false);
@@ -436,21 +396,13 @@ void bptDestroy() {
 	printf("Done.\n");
 }
 
-/** Interface: Initialize */
 void bptInit() {
 	bptDestroy();
 	Root = bptNodeNew();
-	Root->isRoot = true;
 	Root->isLeaf = true;
 	TotalNodes = 0;
 }
 
-/*
-void bptSetMaxChildNumber(int number) {
-	MaxChildNumber = number + 1;
-}
-*/
-/** Interface: print the tree (DEBUG use)*/
 void bptPrint() {
 	struct bptNode* leaf = findLeaf(1000000000, false);
 	int cnt = 0;
@@ -462,9 +414,4 @@ void bptPrint() {
 		}
 		leaf = leaf->last;
 	}
-}
-
-/** Interface: Total Nodes */
-int bptGetTotalNodes() {
-	return TotalNodes;
 }
