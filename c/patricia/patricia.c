@@ -18,9 +18,10 @@ void patPrint(patNode *t) {
 void patDump(patNode *t, int level) {
     if (!t) return;
     printf("%*c", level, ' '); patPrint(t);
+    // printf("%d:", level); patPrint(t);
     if (t->lChild->nbit > t->nbit) // 左子樹若向下指
         patDump(t->lChild, level+1); // 才繼續遞迴印出！
-    if (t->rChild != t) // 右子樹若沒指向自己
+    if (t->rChild->nbit > t->nbit) // 右子樹若沒指向自己
         patDump(t->rChild, level+1); // 才繼續遞迴印出！
 }
 
@@ -47,25 +48,14 @@ patNode* patInsert(patNode *root, char *key, int nbit) {
         return node;
     }
     patNode *last = patSearch(root, key, nbit);
-    /*
-    printf("patInsert:"); patPrint(last);
-    if (bitcmp(key, last->key, nbit)==0) {
-        printf("Key already Present\n");
-        return last;
-    }
-    */
-    int dbit; // 這裡應該可以優化，得從 dbit=0 開始找起嗎？
-    for (dbit=0; dbit<nbit; dbit++) { // 找到第一個不同位置。
-        if (bit(key, dbit) != bit(last->key, dbit)) break;
-    }
-    printf("dbit=%d\n", dbit);
-    if (dbit == nbit) {
+    int dbit = bitcommon(key, last->key, nbit);
+    if (last->key == key || dbit == nbit) {
         printf("Key already Present\n");
         return last;
     }
     patNode *current = root->lChild;
     patNode *parent = root;
-    // 在搜尋一次，找出 parent, current
+    // 再搜尋一次，找出 parent, current
     while (current->nbit > parent->nbit //尚未到樹葉 (向上指代表樹葉)
         && current->nbit < dbit) // 也未到差異位元
     { // 就繼續往下找
