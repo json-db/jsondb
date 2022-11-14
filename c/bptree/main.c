@@ -1,12 +1,14 @@
 #include "bptree.h"
 
-#define N 1000
-char strTable[N*10];
+// #define N 10000
+#define N 50000
+char strTable[N*20];
 char *stp = strTable;
 
 int main() {
     bptInit();
     for (int k = 0; k<N; k++) {
+        // printf("k=%d\n", k);
         // k 的第 1 筆
         sprintf(stp, "%d", 2*k);
         bptInsert(k, stp);
